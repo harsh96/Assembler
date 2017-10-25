@@ -1,28 +1,47 @@
 #include<stdio.h>
 #include<string.h>
 
-int registers[12];
+int registers[16];
 /* AH,AL,BH,BL,CH,CL,DH,DL,AX,BX,CX,DX */
 int CF;
+FILE *op;
+char binI[5];
+void tobinI(int x)
+{	
+	int i=0;
+	while(i<=3)
+	{
+		if(x%2==0) binI[3-i] = '0';
+		else binI[3-i] = '1';
+		x=x/2;
+		i++;
+	}
+	binI[4] = '\0';
+}
 int R(char *c)
 {
-	if(strcmp(c,"AH")==0) return 0;
-	else if(strcmp(c,"AL")==0) return 1;
-	else if(strcmp(c,"BH")==0) return 2;
+	if(strcmp(c,"AL")==0) return 0;
+	else if(strcmp(c,"CL")==0) return 1;
+	else if(strcmp(c,"DL")==0) return 2;
 	else if(strcmp(c,"BL")==0) return 3;
-	else if(strcmp(c,"CH")==0) return 4;
-	else if(strcmp(c,"CL")==0) return 5;
+	else if(strcmp(c,"AH")==0) return 4;
+	else if(strcmp(c,"CH")==0) return 5;
 	else if(strcmp(c,"DH")==0) return 6;
-	else if(strcmp(c,"DL")==0) return 7;
+	else if(strcmp(c,"BH")==0) return 7;
 	else if(strcmp(c,"AX")==0) return 8;
-	else if(strcmp(c,"BX")==0) return 9;
-	else if(strcmp(c,"CX")==0) return 10;
-	else if(strcmp(c,"DX")==0) return 11;
+	else if(strcmp(c,"CX")==0) return 9;
+	else if(strcmp(c,"DX")==0) return 10;
+	else if(strcmp(c,"BX")==0) return 11;
+	else if(strcmp(c,"SP")==0) return 12;
+	else if(strcmp(c,"BP")==0) return 13;
+	else if(strcmp(c,"SI")==0) return 14;
+	else if(strcmp(c,"DI")==0) return 15;
 	else return -1;
 }
 void MOV(char *b,char *c)
 {
 	int reg1,reg2,temp;
+	char result[9];
 	reg1 = R(b);
 	reg2 = R(c);
 	if(reg1<8)
@@ -30,12 +49,33 @@ void MOV(char *b,char *c)
 		if(reg2 != -1)
 		{
 			registers[reg1] = registers[reg2];
+			temp = 10001010;
+			fprintf(op,"%d ",temp);
+			result[0] = '1';
+			result[1] = '1';
+			tobinI(reg1);
+			result[2] = binI[1];
+			result[3] = binI[2];
+			result[4] = binI[3];
+			tobinI(reg2);
+			result[5] = binI[1];
+			result[6] = binI[2];
+			result[7] = binI[3];
+			result[8] = '\0';
+			fprintf(op,"%s\n",result);
 		}
 		else
 		{
 			temp = atoi(c);
-			if(temp<256) registers[reg1] = temp;
-			else printf("Error in MOV");
+			
+			if(temp<256) 
+			{
+				registers[reg1] = temp;
+				temp = 	1011;
+				tobinI(reg1);
+				fprintf(op,"%d%s %s\n",temp,binI,c);
+			}
+			else printf("Error in MOV \n");
 		}
 	}
 	else
@@ -43,11 +83,31 @@ void MOV(char *b,char *c)
 		if(reg2 != -1)
 		{
 			registers[reg1] = registers[reg2];
+			temp = 10001011;
+			fprintf(op,"%d ",temp);
+			result[0] = '1';
+			result[1] = '1';
+			tobinI(reg1);
+			result[2] = binI[1];
+			result[3] = binI[2];
+			result[4] = binI[3];
+			tobinI(reg2);
+			result[5] = binI[1];
+			result[6] = binI[2];
+			result[7] = binI[3];
+			result[8] = '\0';
+			fprintf(op,"%s\n",result);
 		}
 		else
 		{
 			temp = atoi(c);
-			if(temp<65536) registers[reg1] = temp;
+			if(temp<65536)
+			{
+				registers[reg1] = temp;
+				temp = 	1011;
+				tobinI(reg1);
+				fprintf(op,"%d%s %s\n",temp,binI,c);
+			}
 			else printf("Error in MOV");
 		}
 		temp = 2*(reg1-8);
@@ -57,7 +117,8 @@ void MOV(char *b,char *c)
 }
 void ADD(char *b,char *c,int type)
 {
-	int z,reg1,reg2,temp;;
+	int z,reg1,reg2,temp;
+	char result[9];
 	if(type == 0) z = 0; //SIMPLE ADD
 	else z = CF; //ADC
 	reg1 = R(b);
@@ -65,13 +126,40 @@ void ADD(char *b,char *c,int type)
 	if(reg2 != -1)
 	{
 		registers[reg1] += (registers[reg2] + z);
+		tobinI(reg1);
+		fprintf(op,"%s%c","0000001",binI[0]);
+		result[0] = '1';
+		result[1] = '1';
+		result[2] = binI[1];
+		result[3] = binI[2];
+		result[4] = binI[3];
+		tobinI(reg2);
+		result[5] = binI[1];
+		result[6] = binI[2];
+		result[7] = binI[3];
+		result[8] = '\0';
+		fprintf(op," %s\n",result);
 	}
 	else
 	{
 		temp = atoi(c);
+		int s;
+		char w;
+		tobinI(reg1);
+		w=binI[0];
+		if(w=='0') s=0;
+		else
+		{
+			if(temp<128&&temp>-128) s=1;
+			else s=0;
+		}
 		if(reg1<8)
 		{
-			if(temp<256) registers[reg1] += (temp + z);
+			if(temp<256) 
+			{
+				registers[reg1] += (temp + z);
+				fprintf(op,"%s%d%c %s%c%c%c %s\n","100000",s,w,"11000",binI[1],binI[2],binI[3],c);	
+			}
 			else printf("Error in ADD");
 		}
 		else
@@ -156,6 +244,7 @@ main()
 	int i=0,p;
 	FILE *fp;
 	fp=fopen("input.txt","r");
+	op = fopen("machineCode.txt","w");
 	do{
 		fscanf(fp,"%s",f[i]);
 		i++;  
@@ -175,13 +264,13 @@ main()
 			p = atoi(b);
 			if(p==33)
 			{
-				if(registers[0]==1) 
+				if(registers[4]==1) 
 				{
 					scanf("%c",&input);
-					registers[1] = (int)(input);
+					registers[0] = (int)(input);
 				}
-				if(registers[0]==2) printf("%c",registers[7]);
-				if(registers[0]==76) break;
+				if(registers[4]==2) printf("%c",registers[2]);
+				if(registers[4]==76) break;
 			}
 			else
 			{
