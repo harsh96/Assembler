@@ -49,7 +49,7 @@ Sample machineCode.txt Generated:
 ```
 
 Sample Output in STDOUT:
-````bash
+```bash
 BCAF
 ```
 
