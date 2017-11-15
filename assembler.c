@@ -2,7 +2,7 @@
 #include<string.h>
 
 int registers[16];
-/* AH,AL,BH,BL,CH,CL,DH,DL,AX,BX,CX,DX */
+/* AL,CL,DL,BL,AH,CH,DH,BH,AX,CX,DX,BX,SP,BP,SI,DI */
 int CF;
 FILE *op;
 char binI[5];
@@ -46,9 +46,9 @@ void MOV(char *b,char *c)
 	reg2 = R(c);
 	if(reg1<8)
 	{
-		if(reg2 != -1)
+		if(reg2 != -1 && reg2 < 8)
 		{
-			registers[reg1] = registers[reg2];
+			registers[reg1] = registers[reg2]; 
 			temp = 10001010;
 			fprintf(op,"%d ",temp);
 			result[0] = '1';
@@ -64,6 +64,10 @@ void MOV(char *b,char *c)
 			result[8] = '\0';
 			fprintf(op,"%s\n",result);
 		}
+		else if(reg2>=8)
+		{
+			printf("Error in MOV %s %s",b,c);
+		}
 		else
 		{
 			temp = atoi(c);
@@ -73,9 +77,19 @@ void MOV(char *b,char *c)
 				registers[reg1] = temp;
 				temp = 	1011;
 				tobinI(reg1);
-				fprintf(op,"%d%s %s\n",temp,binI,c);
+				fprintf(op,"%d%s %s\n",temp,binI,c); 
 			}
-			else printf("Error in MOV \n");
+			else printf("Error in MOV %s %s",b,c);
+		}
+		if(reg1<4)
+		{
+			temp = registers[reg1+8]/256;
+			registers[reg1+8] = temp*256 + registers[reg1];	
+		}
+		else
+		{
+			temp = registers[reg1+4]%256;
+			registers[reg1+4] = registers[reg1]*256 + temp;	
 		}
 	}
 	else
@@ -110,9 +124,8 @@ void MOV(char *b,char *c)
 			}
 			else printf("Error in MOV");
 		}
-		temp = 2*(reg1-8);
-		registers[temp] = registers[reg1]/256;
-		registers[temp+1] = registers[reg1]%256;
+		registers[reg1-4] = registers[reg1]/256;
+		registers[reg1-8] = registers[reg1]%256;
 	}
 }
 void ADD(char *b,char *c,int type)
@@ -123,7 +136,7 @@ void ADD(char *b,char *c,int type)
 	else z = CF; //ADC
 	reg1 = R(b);
 	reg2 = R(c);
-	if(reg2 != -1)
+	if(reg2 != -1 && reg2<8)
 	{
 		registers[reg1] += (registers[reg2] + z);
 		tobinI(reg1);
@@ -139,6 +152,10 @@ void ADD(char *b,char *c,int type)
 		result[7] = binI[3];
 		result[8] = '\0';
 		fprintf(op," %s\n",result);
+	}
+	else if(reg2>=8)
+	{
+		printf("Error in ADD or ADC");
 	}
 	else
 	{
@@ -176,6 +193,16 @@ void ADD(char *b,char *c,int type)
 			CF = 1;
 		}
 		else CF = 0;
+		if(reg1<4)
+		{
+			temp = registers[reg1+8]/256;
+			registers[reg1+8] = temp*256 + registers[reg1];	
+		}
+		else
+		{
+			temp = registers[reg1+4]%256;
+			registers[reg1+4] = registers[reg1]*256 + temp;	
+		}
 	}
 	else
 	{
@@ -185,9 +212,8 @@ void ADD(char *b,char *c,int type)
 			CF = 1;
 		}
 		else CF = 0;
-		temp = 2*(reg1-8);
-		registers[temp] = registers[reg1]/256;
-		registers[temp+1] = registers[reg1]%256;
+		registers[reg1-4] = registers[reg1]/256;
+		registers[reg1-8] = registers[reg1]%256;
 	}
 }
 void SUB(char *b,char *c,int type)
@@ -223,6 +249,16 @@ void SUB(char *b,char *c,int type)
 			CF = 1;
 		}
 		else CF = 0;
+		if(reg1<4)
+		{
+			temp = registers[reg1+8]/256;
+			registers[reg1+8] = temp*256 + registers[reg1];	
+		}
+		else
+		{
+			temp = registers[reg1+4]%256;
+			registers[reg1+4] = registers[reg1]*256 + temp;	
+		}
 	}
 	else
 	{
@@ -232,16 +268,15 @@ void SUB(char *b,char *c,int type)
 			CF = 1;
 		}
 		else CF = 0;
-		temp = 2*(reg1-8);
-		registers[temp] = registers[reg1]/256;
-		registers[temp+1] = registers[reg1]%256;
+		registers[reg1-4] = registers[reg1]/256;
+		registers[reg1-8] = registers[reg1]%256;
 	}
 }
 
 main()
 {  
 	char f[100][20],a[20],b[20],c[20],input,dummy;
-	int i=0,p;
+	int i=0,p,total,labels[256],temp;
 	FILE *fp;
 	fp=fopen("input.txt","r");
 	op = fopen("machineCode.txt","w");
@@ -250,6 +285,21 @@ main()
 		i++;  
 	}while(strcmp(f[i-1],"END")!=0);
 	i=0;
+	//PASS 1
+	do{
+		strcpy(a,f[i++]);
+		if(strcmp(a,"END")==0) break;
+		else
+		{
+			if(a[1]==':')
+			{
+				temp = a[0];
+				labels[temp] = i;
+			}
+		}
+	}while(1);
+	i=0;
+	//PASS 2
 	do{
 		strcpy(a,f[i++]);
 		if(strcmp(a,"MOV")==0)
@@ -300,6 +350,13 @@ main()
 			strcpy(b,f[i++]);
 			strcpy(c,f[i++]);
 			SUB(b,c,1);
+		}
+		else if(strcmp(a,"JMP")==0)
+		{
+			strcpy(b,f[i++]);
+			temp = b[0];
+			fprintf(op,"11101011 %d\n",labels[temp]-i);
+			i = labels[temp];
 		}
    }while(1);
 }
